@@ -1,8 +1,8 @@
-'''
+"""
 Created on Jul 19, 2011
 
 @author: rtaylor
-'''
+"""
 from math import pi, acos, atan, tan
 import numpy as np
 from numpy import dot
@@ -11,23 +11,34 @@ from numpy.random import random
 from foxsisim.reflectivity import Reflectivity
 from scipy.integrate import quad
 from scipy import stats
+import astropy.units as u
 
 halfpi = pi / 2
 dtf = np.dtype('f8')
 mirror_reflectivity = Reflectivity()
 
 
-def angleBetweenVectors(a, b):
-    '''
-    Returns the angle between two vectors
-    '''
-    return acos(dot(a, b) / (norm(a) * norm(b)))
+@u.quantity_input(vector=u.cm)
+def unit_vector(vector):
+    """ Returns the unit vector of the vector."""
+    if len(vector.shape) == 2:
+        return vector / np.linalg.norm(vector, axis=1)[:,None]
+    else:
+        return vector / np.linalg.norm(vector)
 
+
+def angleBetweenVectors(a, b):
+    """
+    Returns the angle between two vectors
+    """
+    v1_u = unit_vector(a)
+    v2_u = unit_vector(b)
+    return np.rad2deg(np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))) * u.deg
 
 def reflect(x, normal, energy):
-    '''
+    """
     Takes a vector and reflects it in relation to a normal
-    '''
+    """
     # if the angle of incidence is greater than 90 deg, return None
     incident_angle = angle_of_incidence(x, normal)
     graze_angle = halfpi - incident_angle
@@ -40,25 +51,26 @@ def reflect(x, normal, energy):
 
 
 def angle_of_incidence(x, normal):
-    '''
+    """
     Calculate the angle of incidence between a vector and the normal
-    '''
+    """
     return acos(dot(-x, normal) / (norm(x) * norm(normal)))
 
+
 def grazing_angle(x, normal):
-    '''
+    """
     Calculate the grazing angle between a vector and the surface.
     The complement to the angle of incidence.
-    '''
+    """
     return halfpi - acos(dot(-x, normal) / (norm(x) * norm(normal)))
 
 
 def calcShellAngle(radius, focalLength):
-    '''
+    """
     Calculates shell angle(s) given one or more shell radius
     and a focal length. Takes one radius, a list, or a numpy array
     of radii. Returns an angle or a numpy array of angles.
-    '''
+    """
     if type(radius) is np.ndarray or type(radius) is list:
         return np.array([0.25 * atan(r / focalLength) for r in radius], dtf)  # took this eqn from the excel file...
     else:
@@ -66,11 +78,11 @@ def calcShellAngle(radius, focalLength):
 
 
 def calcShellRadius(angle, focalLength):
-    '''
+    """
     Calculates shell radii given one or more shell angles
     and a focal length. Takes one angle, a list, or a numpy array
     of angles. Returns a radius or a numpy array of radii.
-    '''
+    """
     if type(angle) is np.ndarray or type(angle) is list:
         return np.array([tan(a) * focalLength * 4 for a in angle], dtf)
     else:
@@ -78,17 +90,17 @@ def calcShellRadius(angle, focalLength):
 
 
 def genCustomRands(f, n):
-    '''
+    """
     Generate n random numbers given a distribution (x, y)
-    '''
+    """
     dist = getDistribution(f)
     return dist.rvs(size=n)
 
 
 def getDistribution(f):
-    '''
+    """
     Create a distribution to draw random numbers from
-    '''
+    """
     class rv(stats.rv_continuous):
         def _pdf(self, x):
             return f(x)
