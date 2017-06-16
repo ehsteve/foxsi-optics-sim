@@ -1,41 +1,41 @@
-'''
+"""
 Created on Jul 11, 2011
 
 @author: rtaylor
-'''
-from foxsisim.plane import Plane
-from foxsisim.ray import Ray
+"""
 import numpy as np
-from numpy.linalg import norm
 from random import random
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from foxsisim.mymath import genCustomRands
 from scipy.integrate import quad
+import astropy.units as u
 
-dt = np.dtype('f8')
+from foxsisim.plane import Plane
+from foxsisim.ray import Ray
+from foxsisim.mymath import genCustomRands, normalize
 
 
 class Source(Plane):
-    '''
+    """
     Rays are cast from this source to a target region, usually the front end of
     a module object. The source object can be one of three types: 'atinf'
     (source 'at infinity' projecting parallel rays), 'point' (a point at some
     real coordinate in 3-space), and 'nonpoint' (a rectangle centered at some
     real coordinate in 3-space).
-    '''
+    """
 
+    @u.quantity_input(cente=u.cm, width=u.cm, height=u.cm, normal=u.cm)
     def __init__(self,
-                 center=[0, 0, -10],
-                 width=10.302,  # 2*5.151 (max radius of default module)
-                 height=10.302,
-                 normal=[0, 0, 1],
+                 center=[0, 0, -10]*u.cm,
+                 width=10.302*u.cm,  # 2*5.151 (max radius of default module)
+                 height=10.302*u.cm,
+                 normal=[0, 0, 1]*u.cm,
                  type='atinf',
                  color=[1, 1, 1],
                  pixels=None,
                  spectrum=None
                  ):
-        '''
+        """
         Constructor
 
         Parameters:
@@ -47,9 +47,9 @@ class Source(Plane):
             color:     color of projected rays
             pixels:    optional numpy array of pixel colors (W x H x 3)
             spectrum:  optional numpy array (2xN) of energy spectrum
-        '''
+        """
         # normal should be length 1
-        normal = normal / norm(normal)
+        normal = normalize(normal)
 
         # check type
         if type not in ['atinf', 'point', 'nonpoint']:
@@ -62,47 +62,47 @@ class Source(Plane):
         # create rectangular dimensions
         if normal[0] == 0 and normal[2] == 0:  # normal is in y direction
             sign = normal[1]  # 1 or -1
-            ax1 = sign * np.array((0, 0, width), dt)
-            ax2 = sign * np.array((0, height, 0), dt)
+            ax1 = sign * u.Quantity((0, 0, width))
+            ax2 = sign * u.Quantity((0, height, 0))
         else:
             ax1 = np.cross([0, 1, 0], normal)  # parallel to xz-plane
             ax2 = height * np.cross(normal, ax1)
-            ax1 *= width
+            ax1 = ax1 * width
 
         # calc origin
-        origin = np.array(center) - (0.5 * ax1 + 0.5 * ax2)
+        origin = center - (0.5 * ax1 + 0.5 * ax2)
 
         # instantiate
         Plane.__init__(self, origin, ax1, ax2)
-        self.center = np.array(center, dt)
+        self.center = center
         self.type = type
-        self.color = np.array(color, np.dtype('f4'))
+        self.color = np.array(color)
         self.pixels = pixels
         self._spectrum = spectrum
         self._maximum_energy = 1000  # this is the maximum energy considered
 
     def loadImage(self, file=None):
-        '''
+        """
         Loads an image file and stores the pixel values into source (tested with png).
         Passing None as the file name removes any previously loaded pixels.
-        '''
+        """
         if file is None:
             self.pixels = None
         else:
             self.pixels = mpimg.imread(file)
 
     def plotImage(self, figureNum=1):
-        '''
+        """
         Displays the source background to screen
         In case you loaded an Image as your source
-        '''
+        """
         plt.figure(figureNum)
         plt.imshow(self.pixels)
 
     def loadSpectrum(self, spectrum):
-        '''Loads a function, f(energy_keV), as the energy spectrum
+        """Loads a function, f(energy_keV), as the energy spectrum
             for the source
-        '''
+        """
         if not hasattr(spectrum, '__call__'):
             raise ValueError("Spectrum must be a function, f(energy_keV)")
         # normalize the spectrum function in case it is not already
@@ -110,10 +110,10 @@ class Source(Plane):
         self._spectrum = lambda x: 1 / norm_factor[0] * spectrum(x)
 
     def colorAtPoint(self, points):
-        '''
+        """
         Returns the rgb colors for a list of points. Assumes
         each point exists on the source surface.
-        '''
+        """
         colors = np.zeros((len(points), 3), np.dtype('f4'))
 
         # if solid color
@@ -142,7 +142,7 @@ class Source(Plane):
         return colors
 
     def generateRays(self, targetFunc, n, grid=None):
-        '''
+        """
         Returns an array of rays, located at a source and pointed to valid
         target points (on a module/shell/segment).
 
@@ -152,7 +152,7 @@ class Source(Plane):
             n:             the number of random rays to generate
             grid:          the dimensions of a grid of points to generate
                            (alternative to specifying n)
-        '''
+        """
         # create rays array
         if grid is None:
             nRays = n
@@ -171,7 +171,6 @@ class Source(Plane):
 
         # source is at infinity
         if self.type == 'atinf':
-
             # create rays with ori=normal
             srcPnts = self.grid(a, b)
             normal = self.getNormal(0, 0)
@@ -183,7 +182,6 @@ class Source(Plane):
 
         # source is a point
         elif self.type == 'point':
-
             # connect each with point source
             targPnts = targetFunc(a, b)
             for i, ray in enumerate(rays):

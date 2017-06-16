@@ -8,9 +8,9 @@ from math import sin, cos, tan, atan2, pi, sqrt
 import numpy as np
 from numpy.linalg import norm
 from scipy.optimize import fsolve
+import astropy.units as u
 
-twopi = 2 * pi
-dt = np.dtype('f8')
+#dt = np.dtype('f8')
 
 
 class Segmenth(Surface):
@@ -24,12 +24,13 @@ class Segmenth(Surface):
     instantiation, use the updateDims method.
     '''
 
+    @u.quantity_input(base=u.cm, focal=u.cm, seglen=u.cm, ang=u.deg, r0=u.cm, r1=u.cm)
     def __init__(self,
-                 base=[0, 0, 0],
-                 focal=200.0,
-                 seglen=30.0,
-                 ang=0.006,
-                 r0=5.5,
+                 base=[0, 0, 0]*u.cm,
+                 focal=200.0*u.cm,
+                 seglen=30.0*u.cm,
+                 ang=0.006*u.deg,
+                 r0=5.5*u.cm,
                  r1=None
                  ):
         '''
@@ -44,16 +45,16 @@ class Segmenth(Surface):
         '''
         # instantiate
         Surface.__init__(self)
-        self.base = np.array(base, dt)
+        self.base = base
         self.focal = focal
         self.seglen = seglen
         self.ang = ang
-        ''' Vanspeybroeck and Chase Parameters '''
+        # Vanspeybroeck and Chase Parameters
         self.e = cos(4 * ang) * (1 + (tan(4 * ang) * tan(3 * ang)))
         self.d = focal * tan(4 * ang) * tan((4 * ang) - 3 * ang)
         self.updateDims(r0, r1)
 
-
+    @u.quantity_input(r0=u.cm, r1=u.cm)
     def updateDims(self, r0, r1=None):
         '''
         Takes an r0 value and sets the appropriate r1 and ch values (ch is an
@@ -73,6 +74,7 @@ class Segmenth(Surface):
         if self.r0 <= 0 or self.r0 < self.r1 or self.r1 <= 0:
             print('error: invalid segment dimensions')
 
+    @u.quantity_input(u=u.cm, v=u.cm)
     def inRange(self, u, v):
         '''
         Are the u and v parameters in the desired range?
@@ -187,49 +189,50 @@ class Segmenth(Surface):
 
         return result
 
-    def rh(self, u):
+    @u.quantity_input(x=u.cm)
+    def rh(self, x):
         '''
         Parametric equation for the radius of the Hyperboloid
         '''
-        zh = self.focal - u
+        zh = self.focal - x
         aux = self.e ** 2 * (self.d + zh) ** 2 - zh ** 2
         return np.sqrt(abs(aux))
 
-    def x(self, u, v):
+    def x(self, v, w):
         '''
         Parametric equation for x
         '''
-        return self.rh(u) * cos(v) + self.base[0]
+        return self.rh(v) * cos(w) + self.base[0]
 
-    def y(self, u, v):
+    def y(self, v, w):
         '''
         Parametric equation for y
         '''
-        return self.rh(u) * sin(v) + self.base[1]
+        return self.rh(v) * sin(w) + self.base[1]
 
-    def z(self, u, v):
+    def z(self, v, w):
         '''
         Parametric equation for z
         '''
-        return u + self.base[2]
+        return v + self.base[2]
 
-    def du(self, u, v):
+    def du(self, v, w):
         '''
         First partial derivative with respect to u for a Hyperboloid
         '''
-        dx = -cos(v) * (self.e ** 2 * (self.d + self.focal - u) - (self.focal - u)) / self.rh(u)
-        dy = -sin(v) * (self.e ** 2 * (self.d + self.focal - u) - (self.focal - u)) / self.rh(u)
+        dx = -cos(w) * (self.e ** 2 * (self.d + self.focal - v) - (self.focal - v)) / self.rh(v)
+        dy = -sin(w) * (self.e ** 2 * (self.d + self.focal - v) - (self.focal - v)) / self.rh(v)
         dz = 1
-        return np.array((dx, dy, dz))
+        return u.Quantity((dx, dy, dz))
 
-    def dv(self, u, v):
+    def dv(self, v, w):
         '''
         First partial derivative with respect to v for a Hyperboloid
         '''
-        dx = -self.rh(u) * sin(v)
-        dy = self.rh(u) * cos(v)
+        dx = -self.rh(v) * sin(w)
+        dy = self.rh(v) * cos(w)
         dz = 0
-        return np.array((dx, dy, dz))
+        return u.Quantity((dx, dy, dz))
 
     def plot2D(self, axes, color='b'):
         '''
@@ -242,7 +245,7 @@ class Segmenth(Surface):
         '''
         Generates a 3d plot of the segment in the given figure
         '''
-        v = np.linspace(0, twopi, 20)
+        v = np.linspace(0, 2 * np.pi, 20)
         for i in range(len(v)):
             p1 = self.getPoint(0, v[i])
             p2 = self.getPoint(0, v[i - 1])
@@ -262,7 +265,7 @@ class Segmenth(Surface):
         n = len(a)
         pnts = np.zeros((n, 3))
         for i in range(n):
-            ang = twopi * b[i]
+            ang = 2 * np.pi * b[i]
             r = self.r0 * sqrt(a[i])  # we want the polar coords to have a uniform cartesian distribution
             pnts[i, 0] = self.base[0] + r * cos(ang)
             pnts[i, 1] = self.base[1] + r * sin(ang)
@@ -278,7 +281,7 @@ class Segmenth(Surface):
         n = len(a)
         pnts = np.zeros((n, 3))
         for i in range(n):
-            ang = twopi * b[i]
+            ang = 2 * np.pi * b[i]
             r = self.r1 * sqrt(a[i])  # we want the polar coords to have a uniform cartesian distribution
             pnts[i][0] = self.base[0] + r * cos(ang)
             pnts[i][1] = self.base[1] + r * sin(ang)

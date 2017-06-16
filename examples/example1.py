@@ -12,16 +12,18 @@ Created on Aug 15, 2011
 from foxsisim.module import Module
 from foxsisim.plotting import get3dAxes
 import matplotlib.pyplot as plt
+import astropy.units as u
 
 if __name__ == '__main__':
 
     # module parameters for FOXSI
-    focalLength = 200.0
-    segmentLength = 30.0
-    radii = [5.15100, 4.90000, 4.65900, 4.42900, 4.21000, 4.00000, 3.79900]  # 7 shell radii
+    focalLength = 200.0 * u.cm
+    segmentLength = 30.0 * u.cm
+    radii = [5.15100, 4.90000, 4.65900, 4.42900, 4.21000, 4.00000, 3.79900] * u.cm  # 7 shell radii
 
     # create module
-    module = Module(seglen=segmentLength, focal=focalLength, radii=radii, conic=True, core_radius=2.856)
+    core_radius = 2.856 * u.cm
+    module = Module(seglen=segmentLength, focal=focalLength, radii=radii, conic=True, core_radius=core_radius)
 
     # generate cross section
     fig1 = plt.figure(figsize=(9, 3))

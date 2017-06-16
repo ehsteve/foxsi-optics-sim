@@ -1,32 +1,30 @@
-'''
+"""
 Created on Jul 19, 2011
 
 @author: rtaylor
-'''
-from foxsisim.segment import Segment
+"""
 from foxsisim.shell import Shell
 from foxsisim.circle import Circle
-from foxsisim.mymath import reflect, calcShellAngle
-from math import tan, atan, cos, sqrt
-from numpy.linalg import norm
+from foxsisim.mymath import reflect, calcShellAngle, to_cm, normalize, norm
+import astropy.units as u
+import numpy as np
 
 
 class Module:
-    '''
+    """
     A complete foxsi module. By default, it consists of seven nested shells.
-    '''
-
+    """
+    @u.quantity_input(base=u.cm, seglen=u.cm, focal=u.cm, radii=u.cm)
     def __init__(self,
-                 base=[0, 0, 0],
-                 seglen=30.0,
-                 focal=200.0,
-                 radii=[5.151, 4.9, 4.659, 4.429, 4.21, 4.0, 3.799],
-                 angles=None,
-                 conic=False,
+                 base=[0, 0, 0]*u.cm,
+                 seglen=30.0*u.cm,
+                 focal=200.0*u.cm,
+                 radii=[5.151, 4.9, 4.659, 4.429, 4.21, 4.0, 3.799]*u.cm,
+                 conic=True,
                  shield=True,
                  core_radius=None
                  ):
-        '''
+        """
         Constructor
 
         Parameters:
@@ -38,19 +36,15 @@ class Module:
             angles:     optional parameter to overwrite the shell angles computed
                         by constructor
             conic:      if True, use a conic approximation to the Wolter-I parabola-hyperbola.
-            shield:       if True, create a shield at the core of the optic to block straight-thru
+            shield:     if True, create a shield at the core of the optic to block straight-thru
                         flux.
             shield_radius If shield is True then use this value for the shield radius
-        '''
-        if angles is None:
-            angles = calcShellAngle(radii, focal)
-        elif len(radii) != len(angles):
-            raise ValueError('Number of radii and angles do not match')
+        """
+        angles = calcShellAngle(radii, focal)
 
         self.shells = []
         for i, r in enumerate(radii):
-            self.shells.append(Shell(base=base, focal=focal, seglen=seglen, ang=angles[i],
-                                     r=r, conic=conic))
+            self.shells.append(Shell(base=base, focal=focal, seglen=seglen, ang=angles[i], r=r, conic=conic))
 
         # inner core (blocks rays going through center of module)
         # not sure if the core must have an angle to it so made it very small
@@ -59,32 +53,32 @@ class Module:
             self.shield = True
             if core_radius is None:
                 r0 = self.shells[-1].front.r0
-                r1 = r0 - seglen * tan(4 * angles[-1])
+                r1 = r0 - seglen * np.tan(4 * angles[-1])
                 #ang = atan((r0 - r1) / (2 * seglen))
             else:
                 r0 = core_radius
                 r1 = core_radius
             #self.core = Segment(base=base, seglen=2 * seglen, ang=0, r0=r0)
             self.coreFaces = [Circle(center=base, normal=[0, 0, 1], radius=r0),
-                              Circle(center=[base[0], base[1],
-                                             base[2] + 2 * seglen],
+                              Circle(center=u.Quantity([base[0], base[1],
+                                             base[2] + 2 * seglen]),
                                      normal=[0, 0, -1], radius=r0)]
         else:
             self.shield = None
 
     def getDims(self):
-        '''
+        """
         Returns the module's dimensions:
         [radius at wide end, radius at small end, length]
-        '''
+        """
         front = self.shells[0].front
         back = self.shells[0].back
         return [front.r0, back.r1, front.seglen + back.seglen]
 
     def getSurfaces(self):
-        '''
+        """
         Returns a list of surfaces
-        '''
+        """
         surfaces = []
         for shell in self.shells:
             surfaces.extend(shell.getSurfaces())
@@ -93,10 +87,10 @@ class Module:
         return(surfaces)
 
     def passRays(self, rays, robust=False):
-        '''
+        """
         Takes an array of rays and passes them through the front end of
         the module.
-        '''
+        """
         # print('Module: passing ',len(rays),' rays')
 
         # get all module surfaces
@@ -123,6 +117,7 @@ class Module:
                 if ray.pos[2] < self.coreFaces[0].center[2]:
                     sol = self.coreFaces[0].rayIntersect(ray)
                     if sol is not None:
+                        sol = sol * u.cm
                         #print("ray hit face 0")
                         ray.pos = ray.getPoint(sol[2])
                         ray.bounces += 1
@@ -181,7 +176,7 @@ class Module:
                     # if reflected
                     if x is not None:
                         # update ori to unit vector reflection
-                        ray.ori = x / norm(x)
+                        ray.ori = normalize(x)
                     # otherwise, no reflection means ray is dead
                     else:
                         ray.dead = True
@@ -209,13 +204,11 @@ class Module:
                     break
 
     def plot2D(self, axes, color='b'):
-        '''
+        """
         Plots a 2d cross section of the module
-        '''
+        """
         for shell in self.shells:
             shell.plot2D(axes, color)
-        print(self.coreFaces[0].center)
-        print(self.coreFaces[1].center)
         if self.shield is not None:
             # plot core
             #self.core.plot2D(axes, color)
@@ -225,22 +218,23 @@ class Module:
             z0 = self.coreFaces[0].center[2]
             z1 = self.coreFaces[1].center[2]
             #seglen = self.core.seglen
-            axes.plot((z0, z0), (r0, -r0), '-' + color)
-            axes.plot((z1, z1), (r1, -r1), '-' + color)
+
+            axes.plot(to_cm((z0, z0)), to_cm((r0, -r0)), '-' + color)
+            axes.plot(to_cm((z1, z1)), to_cm((r1, -r1)), '-' + color)
 
     def plot3D(self, axes, color='b'):
-        '''
+        """
         Generates a 3d plot of the module in the given figure
-        '''
+        """
         for shell in self.shells:
             shell.plot3D(axes, color)
 
     def targetFront(self, a, b):
-        '''
+        """
         Takes two list arguments of equal size, the elements of which range
         from 0 to 1. Returns an array of points that exist on the circle
         defined by the wide end of the module.
-        '''
+        """
         # must modify 'a' so that we dont return points from the core
         r0 = self.shells[0].front.r0
         r1 = self.coreFaces[0].radius
@@ -251,11 +245,11 @@ class Module:
         return self.shells[0].targetFront(a, b)
 
     def targetBack(self, a, b):
-        '''
+        """
         Takes two list arguments of equal size, the elements of which range
         from 0 to 1. Returns an array of points that exist on the circle
         defined by the small end of the module.
-        '''
+        """
         # must modify 'a' so that we dont return points from the core
         r0 = self.shells[0].back.r1
         r1 = self.coreFaces[0].radius

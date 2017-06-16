@@ -1,32 +1,31 @@
-'''
+"""
 Created on Jul 19, 2011
 
 @author: rtaylor
-'''
+"""
 from foxsisim.plane import Plane
 from foxsisim.source import Source
 import numpy as np
-from numpy.linalg import norm
-
-dtf = np.dtype('f8')
+from foxsisim.mymath import normalize
+import astropy.units as u
 
 
 class Detector(Plane):
-    '''
+    """
     Detector object that catches rays that hit it's rectangular plane, and
     stores their colors in a pixel array.
-    '''
-
+    """
+    @u.quantity_input(center=u.cm, width=u.cm, height=u.cm, normal=u.cm)
     def __init__(self,
-                 center=[0, 0, 230],
-                 width=2,
-                 height=2,
-                 normal=[0, 0, 1],
+                 center=[0, 0, 230] * u.cm,
+                 width=2 * u.cm,
+                 height=2 * u.cm,
+                 normal=[0, 0, 1] * u.cm,
                  reso=[256, 256],
                  pixels=None,
                  freqs=None,
                  ):
-        '''
+        """
         Constructor
 
         Parameters:
@@ -38,26 +37,26 @@ class Detector(Plane):
             pixels:    optional numpy array to hold pixel colors (W x H x 3)
             freqs:     optional array to count the number of times a pixel is
                        hit (W x H)
-        '''
+        """
         # normal should be length 1
-        normal = normal / norm(normal)
+        normal = normalize(normal)
 
         # create rectangular dimensions
         if normal[0] == 0 and normal[2] == 0:  # normal is in y direction
             sign = normal[1]  # 1 or -1
-            ax1 = sign * np.array((0, 0, width), dtf)
-            ax2 = sign * np.array((0, height, 0), dtf)
+            ax1 = sign * u.Quantity((0, 0, width))
+            ax2 = sign * u.Quantity((0, height, 0))
         else:
             ax1 = np.cross([0, 1, 0], normal)  # parallel to xz-plane
             ax2 = height * np.cross(normal, ax1)
-            ax1 *= width
+            ax1 = ax1 * width
 
         # calc origin
-        origin = np.array(center) - (0.5 * ax1 + 0.5 * ax2)
+        origin = center - (0.5 * ax1 + 0.5 * ax2)
 
         # instantiate
         Plane.__init__(self, origin, ax1, ax2)
-        self.center = np.array(center, dtf)
+        self.center = center
         self.reso = reso
         self.pixels = pixels
         self.freqs = freqs
@@ -71,18 +70,18 @@ class Detector(Plane):
         elif pixels.shape[0:2] != freqs.shape:
             raise ValueError('pixels and freqs arrays do not correspond')
 
+    @u.quantity_input(dE=u.keV, range=u.keV)
     def plotSpectrum(self, axes, dE=1, range=[0, 20]):
-        '''
+        """
         Plot the spectrum of the rays in a region of interest (if available,
         not yet implemented) or across the entire detector
-        '''
+        """
         energies = [ray.energy for ray in self.rays]
         axes.hist(energies, bins=(range[1] - range[0]) / dE, range=range)
-        axes.set_xlabel("Energy [keV]")
+        axes.set_xlabel("Energy")
         axes.set_title("Detector Spectrum N = " + str(len(energies)))
 
     def _initDetectorImage(self):
-
         # rgb colors in float form
         pixels = np.zeros((self.reso[0], self.reso[1], 3), np.dtype('f4'))
         # number of times a pixel is hit by a ray
@@ -91,12 +90,12 @@ class Detector(Plane):
         self.freqs = freqs
 
     def catchRays(self, rays):
-        '''
+        """
         Takes an array of rays and tests each for collision with the detector
         plane. If the ray collides, the corresponding pixel in the detector is
         colored. The attribute 'freqs' counts the number of times a pixel is
         hit.
-        '''
+        """
 
         # for each ray
         for ray in rays:
@@ -114,9 +113,9 @@ class Detector(Plane):
                     self.rays.append(ray)
 
     def _makeImage(self, energy_range=None):
-        '''
+        """
         Bin the rays that were caught by the detector to make an image
-        '''
+        """
         # vars
         dims = self.pixels.shape
         colorSum = np.zeros(dims, np.dtype('f4'))

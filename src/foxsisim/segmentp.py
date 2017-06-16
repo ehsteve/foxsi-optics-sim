@@ -1,19 +1,18 @@
-'''
+"""
 Created on Jul 8, 2011
 
 @author: pymilo
-'''
+"""
 from foxsisim.surface import Surface
 from math import sin,cos,tan,atan2,pi,sqrt
 import numpy as np
 from numpy.linalg import norm
 from scipy.optimize import fsolve
+import astropy.units as u
 
-twopi = 2*pi
-dt = np.dtype('f8')
 
 class Segmentp(Surface):
-    '''
+    """
     A shell segment surface defined by parametric equations. It is aligned
     such that its axis is in the z direction, its wide end is facing down
     (negative z) and its small end is facing up (positive z). Usually, the
@@ -21,17 +20,18 @@ class Segmentp(Surface):
     the user may supply a value for r1, in which case the wide radius (r0)
     is automatically recomputed. When changing segment dimensions after
     instantiation, use the updateDims method.
-    '''
+    """
 
+    @u.quantity_input(base=u.cm, focal=u.cm, seglen=u.cm, ang=u.deg, r0=u.cm)
     def __init__(self,
-                 base = [0,0,0],
-                 focal = 200.0,
-                 seglen = 30.0,
-                 ang = 0.006,
-                 r0 = 5.5,
-                 r1 = None
+                 base=[0,0,0]*u.cm,
+                 focal=200.0*u.cm,
+                 seglen=30.0*u.cm,
+                 ang=0.006*u.deg,
+                 r0=5.5*u.cm,
+                 r1=None
                  ):
-        '''
+        """
         Constructor
 
         Parameters:
@@ -40,25 +40,26 @@ class Segmentp(Surface):
             ang:     angle of the segment side to the axis
             r0:      radius of the wide end of the segment
             r1:      radius of the small end of the segment
-        '''
+        """
         # instantiate
         Surface.__init__(self)
-        self.base = np.array(base,dt)
+        self.base = base
         self.focal = focal
         self.seglen = seglen
         self.ang = ang
-        ''' Vanspeybroeck and Chase Parameters '''
-        self.e = cos(4*ang) * (1 + (tan(4*ang)*tan(3*ang)))
-        self.d = focal * tan(4*ang) * tan( (4*ang) - 3*ang)
-        self.P = focal * tan(4*ang) * tan(ang)
-        self.updateDims(r0,r1)
+        # Vanspeybroeck and Chase Parameters
+        self.e = np.cos(4 * ang) * (1 + (np.tan(4 * ang) * np.tan(3 * ang)))
+        self.d = focal * np.tan(4 * ang) * np.tan( (4 * ang) - 3 * ang)
+        self.P = focal * np.tan(4 * ang) * np.tan(ang)
+        self.updateDims(r0, r1)
 
-    def updateDims(self, r0, r1 = None):
-        '''
+    @u.quantity_input(r0=u.cm, r1=u.cm)
+    def updateDims(self, r0, r1=None):
+        """
         Takes an r0 value and sets the appropriate r1 and ch values (ch is an
         important internal parameter). Alternatively, we can pass r1 and it
         sets the appropriate r0 and ch.
-        '''
+        """
         # update r0 and r1
         if r1 is None:
             self.r0 = r0
@@ -72,24 +73,24 @@ class Segmentp(Surface):
         if self.r0 <= 0 or self.r0 < self.r1 or self.r1 <= 0:
             print('error: invalid segment dimensions')
 
-    def inRange(self,u,v):
-        '''
+    def inRange(self, u, v):
+        """
         Are the u and v parameters in the desired range?
-        '''
+        """
         if u >= 0 and u <= self.seglen: return True
         else: return False
 
     def existsInOctant(self,octant):
-        '''
+        """
         Returns whether the surface exists in the supplied octant ***OUTDATED***
-        '''
+        """
 
         def system(params):
-            '''
+            """
             Returns the displacement of a given point on the surface with
             the nearest point in the octant. Requires 3 parameters, but
             only two are used: (u,v,_)
-            '''
+            """
             pnt1 = self.getPoint(params[0], params[1])
             pnt2 = octant.nearestPoint(pnt1)
             return (pnt1[0]-pnt2[0], pnt1[1]-pnt2[1], pnt1[2]-pnt2[2])
@@ -98,7 +99,7 @@ class Segmentp(Surface):
         ctrx = (limits[0][0]+limits[0][1])/2
         ctry = (limits[1][0]+limits[1][1])/2
         guess = (0,atan2(ctry,ctrx),0)
-        X,infodict,ier,mesg = fsolve(system,guess,full_output=1) #@UnusedVariable
+        X,infodict,ier,mesg = fsolve(system, guess, full_output=1) #@UnusedVariable
         valid = False
 
         debug = False
@@ -124,23 +125,23 @@ class Segmentp(Surface):
         return valid
 
     def rayIntersect(self, ray):
-        '''
+        """
         Returns the first intersection of a ray with the surface
         in parametric form (u,v,t) if such a solution exists.
         Otherwise, returns None.
-        '''
+        """
         # display debug messages
         debug = False
 
         def system(params):
-            '''
+            """
             Returns the displacement from a point on the ray to a
             point on the surface. Requires 3 parameters: (u,v,t)
-            '''
+            """
             x = self.x(params[0],params[1]) - ray.x(params[2])
             y = self.y(params[0],params[1]) - ray.y(params[2])
             z = self.z(params[0],params[1]) - ray.z(params[2])
-            return (x,y,z)
+            return (x , y, z)
 
         # make sure ori is a unit vector
         ray.ori = ray.ori / norm(ray.ori)
@@ -184,62 +185,62 @@ class Segmentp(Surface):
 
         return result
 
-    def rp(self,u):
-        '''
+    def rp(self, u):
+        """
         Parametric equation for the radius of the Paraboloid
-        '''
+        """
         zp = self.focal + self.seglen + self.base[2] - u
         aux = self.P**2 + 2*self.P*zp + 4*self.e**2*self.P*self.d/(self.e**2-1)
         return sqrt(abs(aux))
 
-    def x(self,u,v):
-        '''
+    def x(self, u, v):
+        """
         Parametric equation for x
-        '''
+        """
         return self.rp(u) * cos(v) + self.base[0]
 
-    def y(self,u,v):
-        '''
+    def y(self, u, v):
+        """
         Parametric equation for y
-        '''
+        """
         return self.rp(u) * sin(v) + self.base[1]
 
-    def z(self,u,v):
-        '''
+    def z(self, u, v):
+        """
         Parametric equation for z
-        '''
+        """
         return u + self.base[2]
 
-    def du(self,u,v):
-        '''
+    def du(self, u, v):
+        """
         First partial derivative with respect to u
-        '''
+        """
         dx = -cos(v) * self.P/self.rp(u)
         dy = -sin(v) * self.P/self.rp(u)
         dz = 1
-        return np.array((dx,dy,dz))
+        return u.Quantity((dx,dy,dz))
 
-    def dv(self,u,v):
-        '''
+    def dv(self, u, v):
+        """
         First partial derivative with respect to v
-        '''
+        """
         dx = -self.rp(u) * sin(v)
         dy = self.rp(u) * cos(v)
         dz = 0
-        return np.array((dx,dy,dz))
+        return u.Quantity((dx,dy,dz))
 
     def plot2D(self, axes, color = 'b'):
-        '''
+        """
         Plots a 2d cross section of the segment
-        '''
+        """
         axes.plot((self.base[2],self.base[2]+self.seglen),(self.r0,self.r1),'-'+color)
         axes.plot((self.base[2],self.base[2]+self.seglen),(-self.r0,-self.r1),'-'+color)
 
     def plot3D(self, axes, color = 'b'):
-        '''
+        """
         Generates a 3d plot of the segment in the given figure
-        '''
-        v = np.linspace(0,twopi,20)
+        """
+        v = np.linspace(0,2 * np.pi,20)
         for i in range(len(v)):
             p1 = self.getPoint(0,v[i])
             p2 = self.getPoint(0,v[i-1])
@@ -251,15 +252,15 @@ class Segmentp(Surface):
                         '-'+color)
 
     def targetFront(self,a,b):
-        '''
+        """
         Takes two list arguments of equal size, the elements of which range from 0 to 1.
         Returns an array of points that exist on the circle defined by the wide end of
         the segment.
-        '''
+        """
         n = len(a)
         pnts = np.zeros((n,3))
         for i in range(n):
-            ang = twopi*b[i]
+            ang = 2 * np.pi*b[i]
             r = self.r0*sqrt(a[i]) # we want the polar coords to have a uniform cartesian distribution
             pnts[i,0] = self.base[0] + r*cos(ang)
             pnts[i,1] = self.base[1] + r*sin(ang)
@@ -267,15 +268,15 @@ class Segmentp(Surface):
         return pnts
 
     def targetBack(self,a,b):
-        '''
+        """
         Takes two list arguments of equal size, the elements of which range from 0 to 1.
         Returns an array of points that exist on the circle defined by the small end of
         the segment.
-        '''
+        """
         n = len(a)
         pnts = np.zeros((n,3))
         for i in range(n):
-            ang = twopi*b[i]
+            ang = 2 * np.pi*b[i]
             r = self.r1*sqrt(a[i]) # we want the polar coords to have a uniform cartesian distribution
             pnts[i][0] = self.base[0] + r*cos(ang)
             pnts[i][1] = self.base[1] + r*sin(ang)
