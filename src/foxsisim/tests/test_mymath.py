@@ -57,7 +57,7 @@ def test_calcShellRadius(radius, focal_length, angle):
 
 @pytest.mark.parametrize('vector, result', [
     ((1, 1, 1) * u.cm, np.sqrt(3) * u.cm),   # with units
-    (np.array((1,1,1,)), np.sqrt(3)),        # with no units
+    (np.array((1, 1, 1,)), np.sqrt(3)),        # with no units
     ((3, 4, 0) * u.cm, 5 * u.cm)
 ])
 def test_norm(vector, result):

@@ -136,16 +136,19 @@ class Segment(Surface):
             Returns the displacement from a point on the ray to a
             point on the surface. Requires 3 parameters: (u,v,t)
             """
-            x = self.x(params[0],params[1]) - ray.x(params[2])
-            y = self.y(params[0],params[1]) - ray.y(params[2])
-            z = self.z(params[0],params[1]) - ray.z(params[2])
-            return (x, y, z)
+            x = to_cm(self.x(params[0]*u.cm, params[1]*u.cm) - ray.x(params[2]*u.cm))
+            y = to_cm(self.y(params[0]*u.cm, params[1]*u.cm) - ray.y(params[2]*u.cm))
+            z = to_cm(self.z(params[0]*u.cm, params[1]*u.cm) - ray.z(params[2]*u.cm))
+            return np.array((x, y, z))
 
         # make sure ori is a unit vector
         ray.ori = normalize(ray.ori)
 
         # solve with guess at current ray position
-        guess = u.Quantity(ray.pos[2] - self.base[2], np.arctan2(ray.pos[1], ray.pos[0]), 0).value
+        guess = np.zeros(3)
+        guess[0] = (ray.pos[2] - self.base[2]).value
+        guess[1] = np.arctan2(ray.pos[1], ray.pos[0]).value
+        guess[2] = 0
         X, infodict, ier, mesg = fsolve(system, guess, full_output=1) #@UnusedVariable
 
         # if solution found
@@ -159,8 +162,8 @@ class Segment(Surface):
                 # ray can intersect at most twice, so create a second guess
                 tsup = 2*self.seglen
                 pos = ray.getPoint(tsup) # a point really far away from current position
-                guess = (pos[2]-self.base[2],atan2(pos[1],pos[0]),tsup)
-                X,infodict,ier,mesg = fsolve(system,guess,full_output=1) #@UnusedVariable
+                guess = (pos[2] - self.base[2],np.arctan2(pos[1],pos[0]),tsup)
+                X, infodict, ier, mesg = fsolve(system, guess, full_output=1) #@UnusedVariable
 
         # return solution if exists
         result = None
